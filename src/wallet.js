@@ -6,7 +6,7 @@ dotenv.config();
 export class VsysLib {
     constructor(vsysHost, chain, tokCtrtId, sleepTime, poolWalletSeed) {
         this.api = jv.NodeAPI.new(vsysHost);
-        this.chain = new jv.Chain(this.api, chain == "TEST_NET" ? jv.ChainID.TEST_NET: jv.ChainID.MAIN_NET);
+        this.chain = new jv.Chain(this.api, chain == "MAIN_NET" ? jv.ChainID.MAIN_NET: jv.ChainID.TEST_NET);
         this.tc = new jv.TokCtrtWithoutSplit(tokCtrtId, this.chain);
         this.sleepTime = sleepTime;
         this.poolWalletSeed = poolWalletSeed;
@@ -58,7 +58,7 @@ export class VsysLib {
         let resp = await this.tc.send(acnt0, receiverAddr, amt);
         if (resp.hasOwnProperty("error")) {
             console.error(`Send token failed: error: ${resp.error}, message: ${resp.message}`);
-            throw new Error("Send token failed");
+            throw new Error(`Send token failed: error: ${resp.error}, message: ${resp.message}`);
         }
         console.log(resp);
         console.log(`Send token txn id: ${resp.id}`);
