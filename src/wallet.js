@@ -62,7 +62,12 @@ export class VsysLib {
         }
         console.log(resp);
         console.log(`Send token txn id: ${resp.id}`);
-        return await this.waitForConfirm(resp.id);
+        const txnInfo = await this.waitForConfirm(resp.id);
+        if(txnInfo.status != "Success") {
+            console.log(`send token failed, error: ${txnInfo.status}`);
+            throw new Error(`send token failed, error: ${txnInfo.status}`)
+        }
+        return txnInfo;
     };
     async getTokenBalance (walletAddress) {
         const tokBal = await this.tc.getTokBal(walletAddress);
