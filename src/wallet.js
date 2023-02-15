@@ -10,7 +10,7 @@ export class VsysLib {
         this.tc = new jv.TokCtrtWithoutSplit(tokCtrtId, this.chain);
         this.sleepTime = sleepTime;
         this.poolWalletSeed = poolWalletSeed;
-      }
+    }
     async sleep() {
         return new Promise((resolve) => setTimeout(resolve, this.sleepTime));
     } 
@@ -66,6 +66,6 @@ export class VsysLib {
     };
     async getTokenBalance (walletAddress) {
         const tokBal = await this.tc.getTokBal(walletAddress);
-        return tokBal.amount;
+        return tokBal.data;
     };
 }
