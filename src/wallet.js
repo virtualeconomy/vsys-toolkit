@@ -71,6 +71,6 @@ export class VsysLib {
     };
     async getTokenBalance (walletAddress) {
         const tokBal = await this.tc.getTokBal(walletAddress);
-        return tokBal.data;
+        return tokBal.amount;
     };
 }
