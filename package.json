@@ -1,6 +1,6 @@
 {
   "name": "@virtualeconomy/js-vsys-toolkit",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "The official JavaScript Toolkit for VSYS APIs",
   "keywords": [
     "vsys",
@@ -15,13 +15,16 @@
     "node": ">=16"
   },
   "scripts": {
-    "test": "jasmine",
-    "transpile": "npx babel src --out-dir lib"
+    "test": "mocha --config test/config.mocharc.cjs --timeout 100000"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@virtualeconomy/js-vsys": "^0.2.4"
+    "@virtualeconomy/js-vsys": "0.2.5",
+    "chai": "^4.3.7",
+    "mocha": "^10.1.0",
+    "mochawesome": "^7.1.3",
+    "dotenv": "^16.0.3"
   },
   "repository": {
     "type": "git",
