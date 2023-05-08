@@ -21,10 +21,11 @@
   "license": "ISC",
   "dependencies": {
     "@virtualeconomy/js-vsys": "0.2.5",
+    "axlsign": "^1.0.0",
     "chai": "^4.3.7",
+    "dotenv": "^16.0.3",
     "mocha": "^10.1.0",
-    "mochawesome": "^7.1.3",
-    "dotenv": "^16.0.3"
+    "mochawesome": "^7.1.3"
   },
   "repository": {
     "type": "git",
