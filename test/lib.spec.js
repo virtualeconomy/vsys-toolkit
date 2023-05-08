@@ -49,7 +49,7 @@ describe("Vsys toolkit", () => {
             var txn = await library.sendToken(library.poolWalletSeed, 1, newWalletAddress);
             await library.waitForConfirm(txn.id);
             var bal = await library.getTokenBalance(newWalletAddress);
-            expect(bal.toNumber()).to.equal(1);
+            expect(bal).to.equal(1);
         });
     });
     describe("getVsysAccountInfo function", () => {
