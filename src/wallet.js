@@ -1,18 +1,48 @@
 import dotenv from "dotenv";
 import * as jv from "@virtualeconomy/js-vsys";
+import Axlsign from 'axlsign';
 
 dotenv.config();
 
 export class VsysLib {
-    constructor(vsysHost, chain, tokCtrtId, sleepTime, poolWalletSeed) {
+    constructor(vsysHost, chain, tokCtrtId, sleepTime, poolWalletSeed, poolWalletIndex = 0) {
         this.api = jv.NodeAPI.new(vsysHost);
         this.chain = new jv.Chain(this.api, chain == "MAIN_NET" ? jv.ChainID.MAIN_NET: jv.ChainID.TEST_NET);
-        this.tc = new jv.TokCtrtWithoutSplit(tokCtrtId, this.chain);
+        this.tokCtrt = new jv.TokCtrtWithoutSplit(tokCtrtId, this.chain);
         this.sleepTime = sleepTime;
         this.poolWalletSeed = poolWalletSeed;
         this.poolWallet = jv.Wallet.fromSeedStr(this.poolWalletSeed);
-        this.poolAcnt = this.poolWallet.getAcnt(this.chain, 0);
+        this.poolAcnt = this.poolWallet.getAcnt(this.chain, poolWalletIndex);
         this.poolWalletAddress = this.poolAcnt.addr.data;
+    }
+    getVsysAccountInfo (seedPhrase, index = 0) {
+        const seed  = new jv.Seed(seedPhrase);
+        const wal   = new jv.Wallet(seed);
+        const acnt  = wal.getAcnt(this.chain, index);
+        return [acnt, seed, wal]
+    }
+    getWalletAddress(seedPhrase, index = 0) {
+        const [acnt, seed, wallet] = this.getVsysAccountInfo(seedPhrase, index);
+        return acnt.addr.data;
+    }
+    async getVsysBalance(seedPhrase = this.poolWalletSeed, index = 0) {
+        const [acnt, seed, wallet] = this.getVsysAccountInfo(seedPhrase, index);
+        const bal = await acnt.getBal();
+        return bal.data / jv.VSYS.UNIT;
+    }
+    getKeyPair(seedPhrase, index = 0) {
+        const [acnt, seed, wallet] = this.getVsysAccountInfo(seedPhrase, index);
+        return [acnt.keyPair.pri.bytes, acnt.keyPair.pub.bytes];
+    }
+    getSignature(seedPhrase, msg, index = 0) {
+        const [pri, pub] = this.getKeyPair(seedPhrase, index);
+        const signature = Axlsign.sign(pri, Buffer.from(msg, "utf-8"));
+        return jv.B58Str.fromBytes(signature).data;
+    }
+    verifySignature(seedPhrase, msg, signature, index = 0) {
+        const [pri, pub] = this.getKeyPair(seedPhrase, index);
+        const isValid = Axlsign.verify(pub, Buffer.from(msg, "utf-8"), jv.Bytes.fromB58Str(signature).data);
+        return isValid;
     }
     async sleep() {
         return new Promise((resolve) => setTimeout(resolve, this.sleepTime));
@@ -20,17 +50,17 @@ export class VsysLib {
     async waitForConfirm (txId) {
         let info;
         console.log(`Awaiting confirmation for txn ${txId}`);
-        await this.sleep();
         for (let count = 0; count < 3; count++) {
+            await this.sleep();
             info = await this.api.tx.getInfo(txId);
-            if (info.details == "Transaction is not in blockchain") {
-                await this.sleep();
-            } else return info;
+            if (info.details != "Transaction is not in blockchain") {
+                return info;
+            }
         }
         console.log(`Txn ${txId} is not in the blockchain`);
         throw new Error(`Txn ${txId} is not in the blockchain`);
     };
-    createNewWal() {
+    createNewWal() { 
         const wal = jv.Wallet.register();
         return [wal.seed.data, wal.getAcnt(this.chain, 0).addr.data];
     };
@@ -38,45 +68,38 @@ export class VsysLib {
         const amountWithDecimal = amount * 100000000;
         const vsysBal = await this.api.addr.getBalance(walletAddress);
         if (vsysBal.balance < amountWithDecimal) {
-            const poolWallet = jv.Wallet.fromSeedStr(this.poolWalletSeed);
-            const poolAcnt = poolWallet.getAcnt(this.chain, 0);
-            const poolBal = await poolAcnt.getBal();
+            const poolBal = await this.poolAcnt.getBal();
+
             if (poolBal.data < amountWithDecimal) {
                 throw new Error("Insufficient vsys balance in pool!");
             }
-            var txn = await poolAcnt.pay(walletAddress, amount);
-
+            var txn = await this.poolAcnt.pay(walletAddress, amount);
+            if (txn.hasOwnProperty("error")) {
+                console.error(`Send token failed: error: ${resp.error}, message: ${txn.message}`);
+                throw new Error(`Send token failed: error: ${resp.error}, message: ${txn.message}`);
+            }
             const txnInfo = await this.waitForConfirm(txn.id);
+
             if(txnInfo.status != "Success") {
                 console.log(`get vsys from pool failed, error: ${txnInfo.status}`);
                 throw new Error(`get vsys from pool failed, error: ${txnInfo.status}`);
             }
         }
     };
-    getAcntFromSeed(seed, acnt_index = 0){
-        const wallet = jv.Wallet.fromSeedStr(seed);
-        const acnt = wallet.getAcnt(this.chain, acnt_index);
-        return acnt;
-    }
-    async sendToken(senderSeed, amt, receiverAddr = "", tokCtrtId = "") {
-        if (!receiverAddr) {
-            const poolWallet = jv.Wallet.fromSeedStr(this.poolWalletSeed);
-            const poolAcnt = poolWallet.getAcnt(this.chain, 0);
-            receiverAddr = poolAcnt.addr.data
+    async sendToken(seedPhrase, amt, receiverAddr = "", tokCtrtId = "", index = 0) {
+        if (receiverAddr == "") {
+            receiverAddr = this.poolWalletAddress;
         }
         var tokCtrt;
-        if(tokCtrtId != "") {
-            tokCtrt = new jv.TokCtrtWithoutSplit(tokCtrtId, this.chain);
+        if(tokCtrtId == "") {
+            tokCtrt = this.tokCtrt;
         }
         else {
-            tokCtrt = this.tc;
+            tokCtrt = new jv.TokCtrtWithoutSplit(tokCtrtId, this.chain);
         }
-
-        const seed = new jv.Seed(senderSeed);
-        const wal = new jv.Wallet(seed);
-        const acnt0 = wal.getAcnt(this.chain, 0);
-        await this.getVsysFromPool(acnt0.addr.data);
-        let resp = await tokCtrt.send(acnt0, receiverAddr, amt);
+        const [acnt, seed, wal] = this.getVsysAccountInfo(seedPhrase, index);
+        await this.getVsysFromPool(acnt.addr.data);
+        let resp = await tokCtrt.send(acnt, receiverAddr, amt);
         if (resp.hasOwnProperty("error")) {
             console.error(`Send token failed: error: ${resp.error}, message: ${resp.message}`);
             throw new Error(`Send token failed: error: ${resp.error}, message: ${resp.message}`);
@@ -94,15 +117,15 @@ export class VsysLib {
             tokCtrt = new jv.TokCtrtWithoutSplit(tokCtrtId, this.chain);
         }
         else {
-            tokCtrt = this.tc;
+            tokCtrt = this.tokCtrt;
         }
         const tokBal = await tokCtrt.getTokBal(walletAddress);
         return tokBal.amount;
     };
-    async getVsysBalanceFromSeed (seed = this.poolWalletSeed, acntIndex = 0) {
-        const wallet = jv.Wallet.fromSeedStr(seed);
-        const acnt = wallet.getAcnt(this.chain, acntIndex);
-        const balance = await acnt.getBal();
-        return balance.data;
-    };
+    calculateAgreement(theirPubKey, seedPhrase = this.poolWalletSeed, index = 0) {
+        const [pri, pub] = this.getKeyPair(seedPhrase, index);
+        var agreement =  Axlsign.sharedKey(pri, jv.Bytes.fromB58Str(theirPubKey).data);
+        var result = Buffer.from(agreement);
+        return jv.B58Str.fromBytes(result).data;
+    }
 }
