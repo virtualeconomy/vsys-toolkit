@@ -1,7 +1,10 @@
-import { VsysLib } from "../src/wallet.js";
+import { VsysLib, VsysLibBase } from "../src/wallet.js";
 import * as jv from "@virtualeconomy/js-vsys";
 import * as utils from "@virtualeconomy/js-vsys/src/utils/curve_25519.js";
 import { expect } from "chai";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 describe("Vsys toolkit", () => {
     var library;
@@ -97,3 +100,42 @@ describe("Vsys toolkit", () => {
         });
     });
 });
+
+
+describe("Vsys base toolkit", () =>{
+    var base;
+    var newWalletAddress;
+    var newSeed;
+
+    before(() => {
+        base = new VsysLibBase(process.env.HOST, process.env.CHAIN, process.env.SLEEP_TIME);
+    });
+
+    describe("createNewWal function", () => {
+        it("create a wallet", () => {
+            var wallet = base.createNewWal();
+            newWalletAddress = wallet[1];
+            var addr = new jv.Addr(newWalletAddress);
+            addr.validate();
+            newSeed = wallet[0];
+            var count = newSeed.split(' ').length;
+            expect(count).to.equal(15);
+        });
+    });
+
+    describe("getTokenBalance function", () => {
+        it("get token balance", async() =>{
+            const seed = new jv.Seed(process.env.POOL_WALLET_SEED)
+            const wal = new jv.Wallet(seed);
+            const acnt = wal.getAcnt(base.chain, 0);
+            const ctrt = await jv.TokCtrtWithoutSplit.register(acnt, 1000000, 1);
+            await base.sleep(6000)
+            const issue = await ctrt.issue(acnt, 1);
+            await base.waitForConfirm(issue.id);
+            const txn = await ctrt.send(acnt, newWalletAddress, 1)
+            await base.waitForConfirm(txn.id);
+            const bal = await base.getTokenBalance(newWalletAddress, ctrt)
+            expect(bal).to.equal(1)
+        });
+    })
+})
