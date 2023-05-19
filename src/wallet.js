@@ -56,8 +56,8 @@ export class VsysLibBase {
      * @returns {number} balance of the token
     */
     async getTokenBalance (walletAddress, tokCtrt) {
-        if(typeof(tokCtrt) != jv.TokCtrtWithoutSplit) {
-            tokCtrt = new jv.TokCtrtWithoutSplit(tokCtrt, this.chain);
+        if(tokCtrt instanceof jv.TokCtrtWithoutSplit) {
+            tokCtrt = new jv.TokCtrtWithoutSplit(tokCtrt.ctrtId.data, this.chain);
         }
         const tokBal = await tokCtrt.getTokBal(walletAddress);
         return (tokBal.amount).toNumber();
