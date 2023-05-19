@@ -3,8 +3,67 @@ import * as jv from "@virtualeconomy/js-vsys";
 import Axlsign from 'axlsign';
 
 dotenv.config();
-
-export class VsysLib {
+export class VsysLibBase {
+    /**
+     * Create a new Model instance.
+     * @param {string} vsysHost - Vsystems host api
+     * @param {string} chain - MAIN_NET or TEST_NET 
+     * @param {number} sleepTime - Awaiting block time
+    */
+    constructor(vsysHost, chain, sleepTime) {
+        this.api = jv.NodeAPI.new(vsysHost);
+        this.chain = new jv.Chain(this.api, chain == "MAIN_NET" ? jv.ChainID.MAIN_NET: jv.ChainID.TEST_NET);
+        this.sleepTime = sleepTime;
+    }
+    /**
+     * Awaits 
+     * @param {number} sleepTime - Awaiting time in millisecond (ms)
+     * @returns {Promise} Wait for a certain period of time
+    */
+    async sleep(sleepTime = this.sleepTime) {
+        return new Promise((resolve) => setTimeout(resolve, sleepTime));
+    } 
+    /**
+     * Awaits for transaction confirmation
+     * @param {string} txId - Vsystems transaction id
+     * @returns {object} The response of transaction.
+    */
+    async waitForConfirm (txId) {
+        let info;
+        console.log(`Awaiting confirmation for txn ${txId}`);
+        for (let count = 0; count < 3; count++) {
+            await this.sleep();
+            info = await this.api.tx.getInfo(txId);
+            if (info.details != "Transaction is not in blockchain") {
+                return info;
+            }
+        }
+        console.log(`Txn ${txId} is not in the blockchain`);
+        throw new Error(`Txn ${txId} is not in the blockchain`);
+    };
+    /**
+     * Create new wallet
+     * @returns {[string, string]} wallet seed and wallet address
+    */
+    createNewWal() { 
+        const wal = jv.Wallet.register();
+        return [wal.seed.data, wal.getAcnt(this.chain, 0).addr.data];
+    };
+    /**
+     * Get token balance
+     * @param {string} walletAddress - wallet address
+     * @param {string} tokCtrt - Vsystems token contract Id. Defaults to pool token contract
+     * @returns {number} balance of the token
+    */
+    async getTokenBalance (walletAddress, tokCtrt = this.tokCtrt) {
+        if(tokCtrt != this.tokCtrt) {
+            tokCtrt = new jv.TokCtrtWithoutSplit(tokCtrt, this.chain);
+        }
+        const tokBal = await tokCtrt.getTokBal(walletAddress);
+        return (tokBal.amount).toNumber();
+    };
+}
+export class VsysLib extends VsysLibBase{
     /**
      * Create a new Model instance.
      * @param {string} vsysHost - Vsystems host api
@@ -15,6 +74,7 @@ export class VsysLib {
      * @param {number} poolWalletIndex - Index of pool wallet
     */
     constructor(vsysHost, chain, tokCtrtId, sleepTime, poolWalletSeed, poolWalletIndex = 0) {
+        super(vsysHost, chain, sleepTime);
         this.api = jv.NodeAPI.new(vsysHost);
         this.chain = new jv.Chain(this.api, chain == "MAIN_NET" ? jv.ChainID.MAIN_NET: jv.ChainID.TEST_NET);
         this.tokCtrt = new jv.TokCtrtWithoutSplit(tokCtrtId, this.chain);
@@ -59,73 +119,40 @@ export class VsysLib {
     }
     /**
      * Get key pair
-     * @param {string} seedPhrase - Seed of wallet
+     * @param {string} seedPhrase - Seed of wallet. Defaults to pool wallet seed
      * @param {number} index - Index of wallet. Defaults to 0
      * @returns {[jv.PriKey, jv.PubKey]} Private key and public key
     */
-    getKeyPair(seedPhrase, index = 0) {
+    getKeyPair(seedPhrase = this.poolWalletSeed, index = 0) {
         const [acnt, seed, wallet] = this.getVsysAccountInfo(seedPhrase, index);
         return [acnt.keyPair.pri.bytes, acnt.keyPair.pub.bytes];
     }
     /**
      * Get signature
-     * @param {string} seedPhrase - Seed of wallet
      * @param {string} msg - message to be signed
+     * @param {string} seedPhrase - Seed of wallet. Defaults to pool wallet seed
      * @param {number} index - Index of wallet. Defaults to 0
      * @returns {string} signature
     */
-    getSignature(seedPhrase, msg, index = 0) {
+    getSignature(msg, seedPhrase = this.poolWalletSeed, index = 0) {
         const [pri, pub] = this.getKeyPair(seedPhrase, index);
         const signature = Axlsign.sign(pri, Buffer.from(msg, "utf-8"));
         return jv.B58Str.fromBytes(signature).data;
     }
     /**
      * Get signature
-     * @param {string} seedPhrase - Seed of wallet
      * @param {string} msg - message to be signed
      * @param {string} signature - signature of the message
+     * @param {string} seedPhrase - Seed of wallet. Defaults to pool wallet seed
      * @param {number} index - Index of wallet. Defaults to 0
      * @returns {boolean} True or False
     */
-    verifySignature(seedPhrase, msg, signature, index = 0) {
+    verifySignature(msg, signature, seedPhrase = this.poolWalletSeed, index = 0) {
         const [pri, pub] = this.getKeyPair(seedPhrase, index);
         const isValid = Axlsign.verify(pub, Buffer.from(msg, "utf-8"), jv.Bytes.fromB58Str(signature).data);
         return isValid;
     }
-    /**
-     * Awaits 
-     * @param {number} sleepTime - Awaiting time in millisecond (ms)
-     * @returns {Promise} Wait for a certain period of time
-    */
-    async sleep(sleepTime = this.sleepTime) {
-        return new Promise((resolve) => setTimeout(resolve, sleepTime));
-    } 
-    /**
-     * Awaits for transaction confirmation
-     * @param {string} txId - Vsystems transaction id
-     * @returns {object} The response of transaction.
-    */
-    async waitForConfirm (txId) {
-        let info;
-        console.log(`Awaiting confirmation for txn ${txId}`);
-        for (let count = 0; count < 3; count++) {
-            await this.sleep();
-            info = await this.api.tx.getInfo(txId);
-            if (info.details != "Transaction is not in blockchain") {
-                return info;
-            }
-        }
-        console.log(`Txn ${txId} is not in the blockchain`);
-        throw new Error(`Txn ${txId} is not in the blockchain`);
-    };
-    /**
-     * Create new wallet
-     * @returns {[string, string]} wallet seed and wallet address
-    */
-    createNewWal() { 
-        const wal = jv.Wallet.register();
-        return [wal.seed.data, wal.getAcnt(this.chain, 0).addr.data];
-    };
+    
     /**
      * Get vsystems coin from pool
      * @param {string} walletAddress - receiver's wallet address
@@ -155,14 +182,14 @@ export class VsysLib {
     };
     /**
      * Send token
-     * @param {string} seedPhrase - Sender's wallet seed
      * @param {number} amt - Amount to be transferred
+     * @param {string} seedPhrase - Sender's wallet seed. Defaults to pool wallet seed
      * @param {string} receiverAddr - receiver's wallet address. Defaults to pool wallet address
      * @param {string} tokCtrt - Vsystems token contract Id. Defaults to pool token contract
      * @param {number} index - Index. Defaults to 0
      * @returns {object} The response of transaction.
     */
-    async sendToken(seedPhrase, amt, receiverAddr = this.poolWalletAddress, tokCtrt = this.tokCtrt, index = 0) {
+    async sendToken(amt, seedPhrase = this.poolWalletSeed, receiverAddr = this.poolWalletAddress, tokCtrt = this.tokCtrt, index = 0) {
         if(tokCtrt != this.tokCtrt) {
             tokCtrt = new jv.TokCtrtWithoutSplit(tokCtrt, this.chain);
         }
@@ -180,19 +207,7 @@ export class VsysLib {
         }
         return txnInfo;
     };
-    /**
-     * Get token balance
-     * @param {string} walletAddress - wallet address
-     * @param {string} tokCtrt - Vsystems token contract Id. Defaults to pool token contract
-     * @returns {number} balance of the token
-    */
-    async getTokenBalance (walletAddress, tokCtrt = this.tokCtrt) {
-        if(tokCtrt != this.tokCtrt) {
-            tokCtrt = new jv.TokCtrtWithoutSplit(tokCtrt, this.chain);
-        }
-        const tokBal = await tokCtrt.getTokBal(walletAddress);
-        return (tokBal.amount).toNumber();
-    };
+    
     /**
      * Get agreement
      * @param {string} theirPubKey - wallet address
