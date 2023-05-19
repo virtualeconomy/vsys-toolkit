@@ -55,8 +55,8 @@ export class VsysLibBase {
      * @param {string} tokCtrt - Vsystems token contract Id. Defaults to pool token contract
      * @returns {number} balance of the token
     */
-    async getTokenBalance (walletAddress, tokCtrt = this.tokCtrt) {
-        if(tokCtrt != this.tokCtrt) {
+    async getTokenBalance (walletAddress, tokCtrt) {
+        if(typeof(tokCtrt) != jv.TokCtrtWithoutSplit) {
             tokCtrt = new jv.TokCtrtWithoutSplit(tokCtrt, this.chain);
         }
         const tokBal = await tokCtrt.getTokBal(walletAddress);
@@ -206,6 +206,9 @@ export class VsysLib extends VsysLibBase{
             throw new Error(`send token failed, error: ${txnInfo.status}`)
         }
         return txnInfo;
+    };
+    async getTokenBalance (walletAddress, tokCtrt = this.tokCtrt) {
+        return super.getTokenBalance(walletAddress, tokCtrt)
     };
     
     /**
