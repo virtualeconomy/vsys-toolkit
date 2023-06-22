@@ -1,6 +1,6 @@
 {
   "name": "@virtualeconomy/js-vsys-toolkit",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "The official JavaScript Toolkit for VSYS APIs",
   "keywords": [
     "vsys",
