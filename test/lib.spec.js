@@ -9,7 +9,7 @@ describe("Vsys toolkit", () => {
     var newSeed;
 
     before(() => {
-        library = new VsysLib(process.env.HOST, process.env.CHAIN, process.env.TOKEN_CONTRACT_ID, process.env.SLEEP_TIME, process.env.POOL_WALLET_SEED);
+        library = new VsysLib(process.env.HOST, process.env.CHAIN, process.env.SLEEP_TIME, process.env.POOL_WALLET_SEED, 0, process.env.TOKEN_CONTRACT_ID);
     });
     after(async () => {
         const [acnt, seed, wallet] = library.getVsysAccountInfo(newSeed);
@@ -46,7 +46,7 @@ describe("Vsys toolkit", () => {
     });
     describe("sendToken & getTokenBalance function", () => {
         it("send token and get token balance", async () => {
-            var txn = await library.sendToken(library.poolWalletSeed, 1, newWalletAddress);
+            var txn = await library.sendToken(1, library.poolWalletSeed, newWalletAddress);
             await library.waitForConfirm(txn.id);
             var bal = await library.getTokenBalance(newWalletAddress);
             expect(bal).to.equal(1);
@@ -83,8 +83,8 @@ describe("Vsys toolkit", () => {
     });
     describe("getSignature & verifySignature function", () => {
         it("get signature and verify signature", async () => {
-            const sign = library.getSignature(newSeed, "test");
-            const isValid = library.verifySignature(newSeed, "test", sign);
+            const sign = library.getSignature("test", newSeed,);
+            const isValid = library.verifySignature("test", sign, newSeed);
             expect(isValid).to.equal(true);
         });
     });

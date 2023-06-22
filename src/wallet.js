@@ -56,7 +56,7 @@ export class VsysLibBase {
      * @returns {number} balance of the token
     */
     async getTokenBalance (walletAddress, tokCtrt) {
-        if(typeof(tokCtrt) != jv.TokCtrtWithoutSplit) {
+        if(!jv.TokCtrtWithoutSplit.prototype.isPrototypeOf(tokCtrt)) {
             tokCtrt = new jv.TokCtrtWithoutSplit(tokCtrt, this.chain);
         }
         const tokBal = await tokCtrt.getTokBal(walletAddress);
@@ -68,16 +68,15 @@ export class VsysLib extends VsysLibBase{
      * Create a new Model instance.
      * @param {string} vsysHost - Vsystems host api
      * @param {string} chain - MAIN_NET or TEST_NET 
-     * @param {string} tokCtrtId - Token Contract ID
      * @param {number} sleepTime - Awaiting block time
      * @param {string} poolWalletSeed - Seed of pool wallet
      * @param {number} poolWalletIndex - Index of pool wallet
     */
-    constructor(vsysHost, chain, tokCtrtId, sleepTime, poolWalletSeed, poolWalletIndex = 0) {
+    constructor(vsysHost, chain, sleepTime, poolWalletSeed, poolWalletIndex = 0, tokCtrtId = "") {
         super(vsysHost, chain, sleepTime);
         this.api = jv.NodeAPI.new(vsysHost);
         this.chain = new jv.Chain(this.api, chain == "MAIN_NET" ? jv.ChainID.MAIN_NET: jv.ChainID.TEST_NET);
-        this.tokCtrt = new jv.TokCtrtWithoutSplit(tokCtrtId, this.chain);
+        this.tokCtrt = tokCtrtId == "" ? null : new jv.TokCtrtWithoutSplit(tokCtrtId, this.chain);
         this.sleepTime = sleepTime;
         this.poolWalletSeed = poolWalletSeed;
         this.poolWallet = jv.Wallet.fromSeedStr(this.poolWalletSeed);
